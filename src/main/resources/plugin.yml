@@ -1,0 +1,10 @@
+name: Dispatcher
+version: @version@
+author: hazae41
+main: hazae41.minecraft.dispatcher.bukkit.Plugin
+depend: [Sockets]
+
+commands:
+  dispatch:
+    aliases: [serverdispatch]
+    permission: dispatch.use
