@@ -103,6 +103,7 @@ fun Plugin.commands() {
                 val command = args.drop(1).joinToString(" ")
                 connection.conversation("/Dispatcher/dispatch"){
                     val (encrypt, decrypt) = aes()
+                    send(Config.password.encrypt())
                     send(command.encrypt())
                     msg("[$target] "+readMessage().decrypt())
                 }
