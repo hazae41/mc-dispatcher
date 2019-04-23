@@ -2,4 +2,4 @@ name: Dispatcher
 version: @version@
 author: hazae41
 main: hazae41.minecraft.dispatcher.bungee.Plugin
-depend: [Sockets]
+depends: [Sockets]
