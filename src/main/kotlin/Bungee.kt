@@ -11,7 +11,6 @@ import net.md_5.bungee.api.CommandSender
 import net.md_5.bungee.api.chat.BaseComponent
 import net.md_5.bungee.api.connection.ProxiedPlayer
 import net.md_5.bungee.api.event.ChatEvent
-import java.net.ConnectException
 
 class Plugin: BungeePlugin(){
 
@@ -26,7 +25,10 @@ class Plugin: BungeePlugin(){
             if(name !in Config.sockets) return@onSocketEnable
             onConversation("/Dispatcher/dispatch"){
                 val (encrypt, decrypt) = aes()
-                onMessage { message ->
+                val password = readMessage().decrypt()
+                if(password != Config.password) close()
+
+                else onMessage { message ->
                     val command = message.decrypt()
                     execute(command) { message ->
                         launch { send(message.encrypt())  }
@@ -65,6 +67,7 @@ fun Plugin.execute(command: String, callback: (String) -> Unit) {
 
 object Config: ConfigFile("config"){
     val sockets by stringList("sockets")
+    val password by string("password")
 }
 
 fun Array<String>.parameters(callback: (String, String) -> Unit): List<String> {
@@ -105,7 +108,7 @@ fun Plugin.commands() {
             if(args.size >= 2){
                 val command = args.drop(1).joinToString(" ")
                 connection.conversation("/Dispatcher/dispatch"){
-                    val (encrypt, decrypt) = socket.aes()
+                    val (encrypt, decrypt) = aes()
                     send(command.encrypt())
                     msg("[$target] "+readMessage().decrypt())
                 }
@@ -119,7 +122,9 @@ fun Plugin.commands() {
                 msg("&7Now sending commands to $target")
                 msg("&7Type /exit to exit")
                 connection.conversation("/Dispatcher/dispatch"){
-                    val (encrypt, decrypt) = socket.aes()
+                    val (encrypt, decrypt) = aes()
+                    send(Config.password.encrypt())
+
                     sessions[this@command] = { command ->
                         if(command == "exit") {
                             sessions.remove(this@command)

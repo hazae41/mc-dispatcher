@@ -13,7 +13,7 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 }
 
 group 'hazae41'
-version '5.0'
+version '5.1'
 
 apply from: 'mcplugin.gradle'
 apply from: 'spigot.gradle'
@@ -26,7 +26,7 @@ repositories {
 
 dependencies {
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    compileOnly 'com.github.hazae41:mc-multisockets:dev-SNAPSHOT'
+    compileOnly 'com.github.hazae41:mc-multisockets:6.2'
 }
 
 compileKotlin {
