@@ -22,14 +22,13 @@ class Plugin: BukkitPlugin() {
             info("Making magic with $name")
             if(name !in Config.sockets) return@onSocketEnable
             onConversation("/Dispatcher/dispatch"){
-                val (encrypt, decrypt) = aes()
-                val password = readMessage().decrypt()
+                val password = readMessage()
                 if(password != Config.password) close()
 
                 else onMessage { message ->
-                    val command = message.decrypt()
+                    val command = message
                     execute(command) { message ->
-                        launch { send(message.encrypt())  }
+                        launch { send(message)  }
                     }
                 }
             }
@@ -102,10 +101,9 @@ fun Plugin.commands() {
             if(args.size >= 2){
                 val command = args.drop(1).joinToString(" ")
                 connection.conversation("/Dispatcher/dispatch"){
-                    val (encrypt, decrypt) = aes()
-                    send(Config.password.encrypt())
-                    send(command.encrypt())
-                    msg("[$target] "+readMessage().decrypt())
+                    send(Config.password)
+                    send(command)
+                    msg("[$target] "+readMessage())
                 }
             }
 
@@ -117,17 +115,16 @@ fun Plugin.commands() {
                 msg("&7Now sending commands to $target")
                 msg("&7Type /exit to exit")
                 connection.conversation("/Dispatcher/dispatch"){
-                    val (encrypt, decrypt) = aes()
-                    send(readMessage().encrypt())
+                    send(readMessage())
 
                     sessions[this@command] = { command ->
                         if(command == "exit") {
                             sessions.remove(this@command)
                             msg("&7No longer sending commands to $target")
                         }
-                        else launch { send(command.encrypt()) }
+                        else launch { send(command) }
                     }
-                    onMessage { msg("[$target] "+it.decrypt()) }
+                    onMessage { msg("[$target] $it") }
                 }
             }
         }
