@@ -11,10 +11,10 @@ import net.md_5.bungee.api.CommandSender
 import net.md_5.bungee.api.chat.BaseComponent
 import net.md_5.bungee.api.connection.ProxiedPlayer
 import net.md_5.bungee.api.event.ChatEvent
+import java.util.*
 
 class Plugin: BungeePlugin(){
-
-    val sessions = mutableMapOf<ProxiedPlayer, (String) -> Unit>()
+    val sessions = mutableMapOf<UUID, (String) -> Unit>()
 
     override fun onLoad() {
         update(9854)
@@ -43,9 +43,9 @@ class Plugin: BungeePlugin(){
 
         listen<ChatEvent> {
             val player = it.sender as? ProxiedPlayer ?: return@listen
-            if(player !in sessions) return@listen
+            if(player.uniqueId !in sessions) return@listen
             if(!it.isCommand) return@listen
-            sessions[player]!!.invoke(it.message.drop(1))
+            sessions[player.uniqueId]!!.invoke(it.message.drop(1))
             it.isCancelled = true
         }
     }
@@ -104,34 +104,33 @@ fun Plugin.commands() {
             val connection = socket.connections[target]
             ?: return@catch msg("Unknown target: $target")
 
-            if(args.size >= 2){
-                val command = args.drop(1).joinToString(" ")
-                connection.conversation("/Dispatcher/dispatch"){
-                    send(Config.password)
-                    send(command)
-                    msg("[$target] "+readMessage())
-                }
-            }
-
-            else if(this !is ProxiedPlayer) {
-                msg("&cYou can't use sessions!")
-            }
-
-            else {
-                msg("&7Now sending commands to $target")
-                msg("&7Type /exit to exit")
-                connection.conversation("/Dispatcher/dispatch"){
-                    send(Config.password)
-
-                    sessions[this@command] = { command ->
-                        if(command == "exit") {
-                            sessions.remove(this@command)
-                            msg("&7No longer sending commands to $target")
-                        }
-                        else launch { send(command) }
+            when {
+                (args.size >= 2) -> {
+                    val command = args.drop(1).joinToString(" ")
+                    connection.conversation("/Dispatcher/dispatch"){
+                        send(Config.password)
+                        send(command)
+                        onMessage { msg("[$target] $it") }
                     }
-                    onMessage { msg("[$target] $it") }
                 }
+                (this is ProxiedPlayer) -> {
+                    msg("&7Now sending commands to $target")
+                    msg("&7Type /exit to exit")
+                    connection.conversation("/Dispatcher/dispatch"){
+                        send(Config.password)
+
+                        sessions[uniqueId] = { command ->
+                            if(command == "exit") {
+                                sessions.remove(uniqueId)
+                                msg("&7No longer sending commands to $target")
+                            }
+                            else launch { send(command) }
+                        }
+
+                        onMessage { msg("[$target] $it") }
+                    }
+                }
+                else -> msg("&cYou can't use sessions!")
             }
         }
     }

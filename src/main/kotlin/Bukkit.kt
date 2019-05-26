@@ -7,12 +7,18 @@ import hazae41.minecraft.sockets.Sockets.sockets
 import hazae41.sockets.*
 import io.ktor.http.cio.websocket.send
 import kotlinx.coroutines.launch
+import net.md_5.bungee.api.chat.BaseComponent
 import org.bukkit.command.CommandSender
+import org.bukkit.command.ConsoleCommandSender
+import org.bukkit.command.RemoteConsoleCommandSender
+import org.bukkit.conversations.Conversation
+import org.bukkit.conversations.ConversationAbandonedEvent
 import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerCommandPreprocessEvent
+import java.util.*
 
 class Plugin: BukkitPlugin() {
-    val sessions = mutableMapOf<Player, (String) -> Unit>()
+    val sessions = mutableMapOf<UUID, (String) -> Unit>()
 
     override fun onLoad() {
         update(9854)
@@ -27,8 +33,10 @@ class Plugin: BukkitPlugin() {
 
                 else onMessage { message ->
                     val command = message
-                    execute(command) { message ->
-                        launch { send(message)  }
+                    schedule{
+                        execute(command) { message ->
+                            launch { send(message)  }
+                        }
                     }
                 }
             }
@@ -40,16 +48,21 @@ class Plugin: BukkitPlugin() {
         commands()
 
         listen<PlayerCommandPreprocessEvent> {
-            if(it.player !in sessions) return@listen
-            sessions[it.player]?.invoke(it.message.drop(1))
+            if(it.player.uniqueId !in sessions) return@listen
+            sessions[it.player.uniqueId]?.invoke(it.message.drop(1))
             it.isCancelled = true
         }
     }
 }
 
-class Dispatcher(sender: CommandSender, val callback: (String) -> Unit): CommandSender by sender{
+class Dispatcher(sender: ConsoleCommandSender, val callback: (String) -> Unit): ConsoleCommandSender by sender{
     override fun sendMessage(message: String) = callback(message)
     override fun sendMessage(messages: Array<out String>) = messages.forEach(::sendMessage)
+    override fun sendRawMessage(message: String) = sendMessage(message)
+    override fun spigot() = object: CommandSender.Spigot(){
+        override fun sendMessage(component: BaseComponent) = sendMessage(component.toLegacyText())
+        override fun sendMessage(vararg components: BaseComponent) = components.forEach{sendMessage(it)}
+    }
 }
 
 fun Plugin.execute(command: String, callback: (String) -> Unit) {
@@ -98,34 +111,33 @@ fun Plugin.commands() {
             val connection = socket.connections[target]
                 ?: return@catch msg("&7Unknown target: $target")
 
-            if(args.size >= 2){
-                val command = args.drop(1).joinToString(" ")
-                connection.conversation("/Dispatcher/dispatch"){
-                    send(Config.password)
-                    send(command)
-                    msg("[$target] "+readMessage())
-                }
-            }
-
-            else if(this !is Player) {
-                msg("&cYou can't use sessions!")
-            }
-
-            else {
-                msg("&7Now sending commands to $target")
-                msg("&7Type /exit to exit")
-                connection.conversation("/Dispatcher/dispatch"){
-                    send(readMessage())
-
-                    sessions[this@command] = { command ->
-                        if(command == "exit") {
-                            sessions.remove(this@command)
-                            msg("&7No longer sending commands to $target")
-                        }
-                        else launch { send(command) }
+            when {
+                (args.size >= 2) -> {
+                    val command = args.drop(1).joinToString(" ")
+                    connection.conversation("/Dispatcher/dispatch"){
+                        send(Config.password)
+                        send(command)
+                        onMessage { msg("[$target] $it") }
                     }
-                    onMessage { msg("[$target] $it") }
                 }
+                (this is Player) -> {
+                    msg("&7Now sending commands to $target")
+                    msg("&7Type /exit to exit")
+                    connection.conversation("/Dispatcher/dispatch"){
+                        send(Config.password)
+
+                        sessions[uniqueId] = { command ->
+                            if(command == "exit") {
+                                sessions.remove(uniqueId)
+                                msg("&7No longer sending commands to $target")
+                            }
+                            else launch { send(command) }
+                        }
+
+                        onMessage { msg("[$target] $it") }
+                    }
+                }
+                else -> msg("&cYou can't use sessions!")
             }
         }
     }
